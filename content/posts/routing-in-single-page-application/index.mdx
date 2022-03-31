@@ -1,0 +1,330 @@
+---
+title: "Routing in Single Page Application"
+date: 2021-05-30
+slug: "/routing-in-single-page-application"
+---
+
+
+### What the heck is Single Page Application aka SPA ?
+One of the most fundamental operations on the web is clicking on a link. The click can result in one of the following:
+* Open a new tab.
+* Reload the current page to render new content fetched from the server.
+* Change the content of the page without reloading (This is what a SPA does).
+
+When a user runs an app or a website and click on links, the URL and content of the page changes, but **the page does not reload**, i.e., the user stays on the same page for the entire duration; such application is called a Single Page Application, aka SPA.
+
+### Features of SPA
+
+* There should not be a full page reload upon clicking on internal app links. (Clicking on external links may result in page reload).
+
+* The content of the page is changed dynamically (fetched from the server) without reloading the page.
+
+* Even though the URL (pathname) changes, the page must not reload.
+
+* If a URL is copy/pasted on a different browser, it must land on the same page even though the URL is internal to the app.
+
+### Location Object in the browser window
+Every browser tab maintains a session array that consists of all the visited URLs since the tab was active. Normally, the browser's current URL would be the last item in the session array. So, If we push a new URL in the session array, the browser would automatically redirect the user to that URL. **window.location.href(newURL) or window.location.assign(newURL) or window.location.replace(newURL)** is used to push an item in the session array. But, the problem with this approach is that the page reloads. Hence, SPA is not possible.
+Internal routing in an SPA is dependent on the pathname that can be accessed from **window.location.pathname**. Changing the pathname in the URL does not cause the page to reload but there was no method available till then to update it.
+
+To solve this problem, the developers of HTML5 made the history object available in the browser's window object. They introduced new methods in the history object:
+
+* **Window.history.pushState(state, '', pathName)** - It pushes the new URL at the end of the session array and changes the current URL to the new one.
+
+* **Window.history.replaceState(state, '', pathName)** - It pops the last item in the session array and pushes the new URL (i.e., replaces the last item of the array).
+
+* **Window.history.go(number)** – It can jump to a specific item in the session array relative to the current one.  It takes a single argument, a number, which is the number of entries away from the current one you want to navigate. Positive numbers go forward, negative numbers go backward, and zero (or undefined) reloads the page.
+
+* **Window.history.back()** - same as go(-1)
+
+* **Window.history.forward()** - same as go(1)
+*back() and forward() are used by browser's back and forward buttons.*
+**All these methods allow changing the URL without reloading the page.**
+
+### What is State?
+State is the data that is preserved during navigation. It is passed along with the
+**window.history.pushState({val : "hello"}, '', pathName})**. Even though a user navigates to a different URL and returns, the state would be preserved (i.e., the same value passed as the state could still be accessed unaltered).
+State at a particular URL can be accessed by **window.history.state**
+**Note - There might be a problem in directly landing on a page that depends on a state. If a user directly lands on a page, the state inside it would be null, and the dependants might throw an error. So, it’s better to avoid such dependencies.**
+
+### Route Matching
+SPA maintains **routes** an array of objects containing **pathname**, **id**, and corresponding **component**. Here route matching depends on pathname and id. We get pathname from URL and id from the buttons. Whenever the pathname in the URL changes, it is matched with all the routes already declared in the **‘routes’** array. Upon matching, the render function renders the corresponding component on the screen.
+**Here, the routing depends entirely on the pathList array and not on the browser’s history. All the dependencies and implementations are based on the pathList.** The **‘pathList’** consists of all the pathname that the user has visited. It is a replica of the session array, handled with the custom functions.
+Below is an example of **routes** array.
+
+```
+var pathList = [];
+export const routes = [
+  {
+    id: "about",
+    path: "/about",
+    component: About
+  },
+  {
+    id: "home",
+    path: "/home",
+    component: Home
+  },
+  {
+    id: "contact",
+    path: "/contact",
+    component: Contact
+  },
+  {
+    id: "error",
+    path: "/error",
+    component: NotFound
+  },
+  {
+    id: "root",
+    path: "/",
+    component: root
+  }
+];
+
+``` 
+
+**Now, let's create a SPA with the routing capabilities:**
+- When a user lands directly on the internal app URL.
+- Using buttons to visit different routes.
+- A back button that takes the user to the previous route.
+
+A simple HTML page with buttons for routing to different URLs.
+
+Code - [Sandbox](https://t1nnw.csb.app/)
+
+**index.html**
+
+```
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Parcel Sandbox</title>
+    <meta charset="UTF-8" />
+  </head>
+
+  <body>
+    <div id="app"></div>
+    <button id="back">Back</button>
+    <button id="root">Root</button>
+    <button id="home">Home</button>
+    <button id="about">About</button>
+    <button id="contact">Contact</button>
+    <div id="data"></div>
+    <script
+      src="src/index.js"
+      language="Javascript"
+      type="text/javascript"
+    ></script>
+  </body>
+</html>
+
+
+
+```
+
+**index.js**
+
+```
+import { 
+  createHistory, 
+  handleOnLoad, 
+  prev, 
+  handleClickRoute 
+} from "./router";
+
+import { NotFound } from "./components";
+
+const historyMethods = new createHistory();
+
+window.onload = handleOnLoad();
+
+const home = document.querySelector("#home");
+const about = document.querySelector("#about");
+const contact = document.querySelector("#contact");
+const back = document.querySelector("#back");
+const root = document.querySelector("#root");
+
+home.addEventListener("click", handleClickRoute);
+about.addEventListener("click", handleClickRoute);
+contact.addEventListener("click", handleClickRoute);
+root.addEventListener("click", handleClickRoute);
+back.addEventListener("click", prev);
+
+export function pageNotFound() {
+  const template = NotFound();
+  historyMethods.push("/error");
+  render(template, document.querySelector("#data"));
+}
+
+export function render(template, node) {
+  node.innerHTML = template;
+}
+
+
+``` 
+
+
+
+**component.js**
+
+creating some very simple components.
+
+```
+
+
+export const Contact = () => {
+  return "This is the Contact page";
+};
+
+export const Home = () => {
+  return "This is the Home Page";
+};
+
+export const About = () => {
+  return "This is the About Page";
+};
+
+export const NotFound = () => {
+  return "Page not found";
+};
+
+export const root = () => {
+  return `
+    <h1>Available Paths: </h1>
+    <b>/home</b><br>
+    <b>/about</b><br>
+    <b>/contact</b><br>
+  `;
+};
+
+
+``` 
+
+
+**‘createHistory’** implements all the basic routing methods that we will use inside the application.
+
+- **push **– Pushes the new pathname in the pathList and session array and loads the corresponding component.
+
+- **replace **– Pops and then Pushes, i.e., replaces the pathname in the pathList and session array and loads the corresponding component.
+
+- **goBack **– It does not remove anything from pathList. Just pushes the previous route in the session array.
+
+Let's dive into the code:
+
+**router.js**
+
+Here we create functions that will handle different
+routing Operations.
+
+```
+
+export const createHistory = () => {
+  const push = (path) => {
+    pathList.push(path);
+    window.history.pushState(null, "", path);
+  };
+
+  const replace = (path) => {
+    pathList.pop();
+    pathList.push(path);
+    window.history.replaceState("https://t1nnw.csb.app", "", path);
+  };
+
+  const goBack = (path) => {
+    window.history.pushState("https://t1nnw.csb.app", "", path);
+  };
+
+  return { push, replace, goBack };
+};
+
+const historyMethods = new createHistory();
+
+``` 
+**Here the routing is controlled in three different manners:**
+
+- **handleOnLoad **– When the user would land directly on the internal pathname of the app.
+
+- **handleClickRoute **– When the user changes the route on button click.
+
+- **prev **– When the user hits the back button (different from browser back button).
+
+**1.** **When a user directly lands on a URL:**<br />
+When the page loads, this method extracts the pathname from
+Window.location.pathname and performs the route matching.
+Upon matching, it invokes the history.push(path) method and
+renders the corresponding component.
+```  
+export const handleOnLoad = () => {
+  const path = window.location.pathname;
+  for (let i = 0; i < routes.length; i++) {
+    if (routes[i].path === path) {
+      const template = routes[i].component();
+      historyMethods.push(path);
+      render(template, document.querySelector("#data"));
+      return;
+    }
+  }
+  pageNotFound();
+};
+
+``` 
+
+**2.** **When a user clicks on a button/link to go to a different route:** <br />
+When the user clicks the button, this method extracts the id 
+of the button and performs the route matching based on the
+id. Upon matching, it invokes the history.push(path) method 
+and renders the corresponding component.
+
+```
+export function handleClickRoute(event) {
+  const id = event.target.id;
+  for (let i = 0; i < routes.length; i++) {
+    if (routes[i].id === id) {
+      const template = routes[i].component();
+      historyMethods.push(routes[i].path);
+      render(template, document.querySelector("#data"));
+      return;
+    }
+  }
+  pageNotFound();
+}
+
+``` 
+
+
+
+**3.** **Specific implementation of Back button (different from browser back button):**<br />
+First, it pops the last element of the array because 
+Currently, the last element is the pathname the user is
+Currently on. Then, it extracts the last item and performs
+the route matching based on the pathname and renders the
+component accordingly.
+
+```
+export const prev = () => {
+  pathList.pop();
+  if (pathList.length === 0) {
+    return;
+  }
+  const path = pathList[pathList.length - 1];
+  for (let i = 0; i < routes.length; i++) {
+    if (routes[i].path === path) {
+      const template = routes[i].component();
+      historyMethods.goBack(path);
+      render(template, document.querySelector("#data"));
+      return;
+    }
+  }
+  pageNotFound();
+};
+```
+
+If no pathname or id matches, then the function renders 
+the pageNotFound component. 
+
+Lets connect
+[LinkedIn](https://www.linkedin.com/in/aditya-prabhat-4aa395184/)
+[Twitter](https://twitter.com/AdityaPrabhat09)
+
+

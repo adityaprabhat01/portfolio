@@ -1,0 +1,102 @@
+---
+title: Event Loop and asynchrony in JavaScript
+date: 2022-03-13
+---
+
+The below image is a very simplified view of the JS engine.
+
+![image.png](https://cdn.hashnode.com/res/hashnode/image/upload/v1647171841534/mrAJDfjXk.png)
+
+It has two components: 
+1.	Memory heap – This is where memory allocation takes place. 
+2.	Call Stack – It’s a stack that keeps track of the function in the script that’s currently executing and the function that has called this function.
+
+### Call Stack
+Consider this code snippet.
+
+```
+function greet() {
+  console.log("Greeting")
+  setTimeout(() => {
+    console.log("Callback")
+  }, 2000)
+}
+
+function print() {
+  greet()
+}
+
+print()
+```
+
+
+![image.png](https://cdn.hashnode.com/res/hashnode/image/upload/v1647171942155/43Wcq-5w_.png)
+
+
+When the execution of the script starts, the *demo* function is called and placed on the call stack. The JS engine then executes *demo*, which calls *console.log()*. So, now *console.log()* is pushed into the stack and executed. After its execution, it’s popped, and the control goes back to *demo*. Which then calls *greet* and places it on top of the stack. Then, the execution of *greet* begins, and *console.log()* is pushed into the stack. After the *console.log()* is executed, its popped, and the control returns to *greet*. It then pushes the *setTimeout* into the stack. JS engine then calls some API that takes *setTimeout* away from the call stack and control returns to *greet*, which is also popped as all the statements in greet are executed. And finally, the execution of *demo* is also over, and it’s popped, and the stack becomes empty.
+
+Then after some time, from somewhere, *console.log(“Callback”)* is pushed into the stack, executed, and popped. And the stack becomes empty again. Now, the main question remains where did that *console.log(“Callback”)* come from? JavaScript is a single-threaded language that means the code is always executed in the flow they’re called. Then, how come that *setTimeout* timer was set or requests are made in parallel with the main thread. That’s where the Web APIs come into the picture.
+
+
+### Web APIs
+Web APIs are the threads you cannot access and can only make calls to. These are those threads implemented in the browser that enables concurrency. These are not part of the JavaScript engine; instead, they are built into the browsers, providing you with great functionalities to use in your JavaScript code. These APIs can expose data from the browser to those APIs and perform complex tasks. Examples of browser APIs are:
+- APIs for DOM manipulation 
+- APIs to fetch data from the server, e.g., Fetch, XMLHttpRequest 
+- APIs for animation and graphics, e.g., requestAnimationFrame, Canvas 
+- Audio and Video APIs 
+- Geolocation APIs
+
+### What is Event Loop?
+The Event Loop has one job — to monitor the Call Stack and the Callback Queue. If the Call Stack is empty, the Event Loop will take the first event from the queue and push it to the Call Stack, which effectively runs it. Such an iteration is called a tick in the event loop. Each event is just a function called back by an asynchronous task.
+
+### Task Queue
+
+They are also called Callback queue. When you pass callback into an asynchronous function, the callback is called when the async task is over. But precisely how that callback function is executed? That’s where the Task queue and Event Loop come into the picture. Remember, the *demo()* function. *setTimeout* was called by *greet*, and it was taken by the Web API, and suddenly from somewhere, it was pushed into the stack. Let’s dig deeper into this mechanism. When the *setTimeout* was executed, the browser started a 2000ms timer in the background. The callback function was sent to the Task queue when the timer expired. 
+So again, what is Event Loop? Event Loop is an infinite loop mechanism that checks if the Task Queue is not empty. If tasks are queued to be executed, it would remove the first task from the task queue and push it into the call stack. It will only execute that task if the call stack is empty. Since it’s a queue, it follows the FIFO sequence. *setTimeout(cb, 2000)* doesn’t necessarily mean that the callback will be executed after 2000ms; instead, it means that the callback will be pushed into the task queue after 2000ms. It might take longer to execute if there are already more items in the queue.
+
+
+
+![image.png](https://cdn.hashnode.com/res/hashnode/image/upload/v1647173025068/Y0a99ceZr.png)
+
+![image.png](https://cdn.hashnode.com/res/hashnode/image/upload/v1647173030988/1aO0-0-Pa.png)
+
+### Render Pipeline
+
+A screen with a 60Hz refresh rate renders 60 times a minute, i.e., once every 16.67ms. The browser must ideally repaint the screen in the same interval. To do that event loop runs the render pipeline. Since JavaScript is a single-threaded language, if the main thread is blocked by some task taking longer than 16.67ms to execute, the event loop won’t be able to run the render pipeline. If it fails to run the render pipeline in time, that will result in the browser dropping the frames. A few cases are: 
+
+- Let’s assume that your code somehow flooded the microtask queue. Once the event loop starts executing tasks from the microtask queue, it won’t stop until it executes all, and the queue is empty. This is quite possible that executing all those tasks take more than 16.67ms. At that point, the browser was ideally supposed to run the render pipeline, but it couldn’t because the microtask queue is still executing, and it has blocked the main thread. 
+- Let’s assume you put an image processing task on the call stack that would also take more than 16.67ms to execute. It would again take longer to execute, resulting in frame drops.
+
+### Microtask Queue
+There exists one more queue called the Microtask queue. This queue has a priority that the event loop checks this queue after every other task. If this queue is not empty, the oldest task from this queue executes and executes all the tasks until the queue is empty. So, it’s worth mentioning that this queue can execute infinitely if tasks are continuously added to the queue.
+
+So, what kind of functions or tasks are there in the queue? Have you heard of Promises? The callback that we pass to then method is put in this queue and is executed on priority. When microtasks are executing, the main JS thread would be engaged in executing these microtasks only. All other queues would be ignored, and even the render pipeline would be compromised and won’t run.
+
+This means that if we put many tasks in the microtask queue, our UI would block. And executing a task on call stack that takes quite long to finish, like image processing, would cause the event loop to be stuck with that task, and it won’t be able to render frames due to which your UI would be stuck. Overall, your app is stuck. So, beware when executing long tasks like rendering thousands of list items or image processing. You can use setTimeout(cb, 0); this would defer the task and would execute again only when the call stack is empty, giving chances to other tasks to execute.
+
+```
+// This would recursively call foo
+function foo() {
+  Promise.resolve().then(() => foo());
+}
+
+foo()
+```
+
+Flood Microtask Queue - [Demo](https://djnu3s.csb.app/)
+
+### User Interaction Event callback queue
+There is one more queue that deals with mouse events and inputs tasks. This queue has no special priority. It’s just like the task queue. The event loop could select task queue or user interaction queue in any sequence and execute the tasks in a FIFO manner.
+
+### Request Animation Frame callback queue
+Here, it gets trickier with the animation queue and renders pipeline conjunction. When executing a function to run animation, the callback is put into this queue. Let’s consider a situation where there are already multiple tasks in the animation queue. In such a case event loop would execute all those tasks and then run the render pipeline so that the user can see those animations.
+But, in case of tasks are still adding to the queue when the event loop is executing tasks from animation queue, then unlike microtask queue, the event loop would run the render pipeline considering only those tasks that are meant for one frame. If it executes all the tasks at a time and then runs the render pipeline, then there would be a blast of animations on the screen or no animation at all.
+**In bird's eye view, the whole Event Loop mechanism looks somethings like this.**
+
+
+![image.png](https://cdn.hashnode.com/res/hashnode/image/upload/v1647173804882/GpnJW0arR.png)
+
+
+Let's connect <br/>
+[LinkedIn](https://www.linkedin.com/in/aditya-prabhat-4aa395184/)
+[Twitter](https://twitter.com/AdityaPrabhat09)

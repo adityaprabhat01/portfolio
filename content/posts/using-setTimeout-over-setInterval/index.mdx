@@ -1,0 +1,55 @@
+---
+title: Using setTimeout over setInterval
+date: 2022-03-24
+---
+
+What if you need a function that makes an ajax request repeatedly after a specific time interval? What would you do? Writing a ***setInterval(callback, delay)*** would seem to be the ideal way, right? But there’s a problem.
+
+```
+function serverFetch() {
+  setTimeout(function() {
+    console.log('Fetched from server', new Date().toLocaleTimeString());
+  }, 3000);
+}
+
+function usingSetInterval() {
+  setInterval(function() {
+    console.log("Requested", new Date().toLocaleTimeString())
+    serverFetch();
+  }, 100)
+}
+
+usingSetInterval();
+```
+
+![image.png](https://cdn.hashnode.com/res/hashnode/image/upload/v1648132372596/DTGCDVjIQ.png)
+
+**setInterval** keeps on making requests without even caring about whether the previous requests have finished or not. In such a case, the server would be flooded with the request. So, how could we keep track of previous requests and schedule the next one? We can use nested **setTimeout** in such a case.
+
+```
+function serverCall() {
+  setTimeout(function() {
+    console.log('Fetched from server', new Date().toLocaleTimeString());
+    setTimeout(usingSetTimeout, 100)
+  }, 2000);
+}
+
+function usingSetTimeout() {
+  setTimeout(function longTask() {
+    console.log("Requested", new Date().toLocaleTimeString())
+    serverCall();
+  }, 100);
+}
+
+usingSetTimeout()
+
+```
+
+
+![image.png](https://cdn.hashnode.com/res/hashnode/image/upload/v1648132421391/KNAUJjq6u.png)
+
+The setTimeout above schedules the next call right at the end of the current one. Because of which no flooding of requests happen. Instead, the setInterval would schedule the next call just at the end of the interval.
+
+Let's connect <br/>
+[LinkedIn](https://www.linkedin.com/in/aditya-prabhat-4aa395184/)
+[Twitter](https://twitter.com/AdityaPrabhat09)
